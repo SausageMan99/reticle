@@ -1,0 +1,3 @@
+### Fixed
+
+- **`@reticlehq/engine`: `stale-response-applied` fired on two reads that only asked for different columns.** Two overlapping GETs of one PostgREST/Supabase table with the same filters but a different `select=` (or `fields`, `columns`, `include`, `expand`) settling out of order came back as a race, although both answers are wanted and neither overwrites the other. A differing projection now makes two reads different shapes, the same way a differing key set already does; a real filter race under the same projection is still reported. Closes [#1455](https://github.com/reticlehq/reticle/issues/1455).

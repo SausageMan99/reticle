@@ -235,4 +235,27 @@ describe('parallel fan-out is not a race', () => {
       expect(race('type=a', 'type=b', 60)).toHaveLength(1);
     });
   });
+
+  // #1455: same keys, different columns — two shapes of one row set, both wanted.
+  describe('reads that ask for different columns', () => {
+    const race = (one: string, two: string) =>
+      findStaleResponses([
+        pending(0, `/rest/v1/items?${one}`, 'a'),
+        pending(10, `/rest/v1/items?${two}`, 'b'),
+        settled(100, 'b'),
+        settled(900, 'a'),
+        applied(900),
+      ]);
+
+    it.each(['select', 'fields', 'columns', 'include', 'expand'])(
+      'a projection that differs only in `%s`',
+      (param) => {
+        expect(race(`${param}=a&parent=eq.1`, `${param}=b&parent=eq.1`)).toEqual([]);
+      },
+    );
+
+    it('while the same projection with a different filter is still a race', () => {
+      expect(race('select=a&status=eq.x', 'select=a&status=eq.y')).toHaveLength(1);
+    });
+  });
 });

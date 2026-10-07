@@ -89,6 +89,13 @@ function differsOnlyByEnumeration(first: string, second: string): boolean {
 const IDENTITY_PARAMS = new Set(['id', 'ids', 'uuid', 'slug', 'key']);
 
 /**
+ * Parameters that SHAPE the answer rather than choose its rows. Two reads differing in one of these
+ * (PostgREST's `?select=id,status` beside `?select=notes`) ask for different columns of the same
+ * rows, so both answers are wanted and neither overwrites the other's view (#1455).
+ */
+const PROJECTION_PARAMS = new Set(['select', 'fields', 'columns', 'include', 'expand']);
+
+/**
  * Issued this close together, two requests came from one task (a `Promise.all`, two effects in one
  * commit), so no later intent superseded the first: they are a fan-out, not a race (#1225).
  * ponytail: a time bound stands in for "same task", which the event stream does not carry. A slow
@@ -98,8 +105,9 @@ const SAME_TASK_MS = 2;
 
 /**
  * Whether the second read could have made the first obsolete. Not when they ask for differently
- * shaped answers (the key sets differ: a page of rows beside a count), not when they name different
- * resources, and not when only enumeration changed.
+ * shaped answers (the key sets differ: a page of rows beside a count; or a projection differs:
+ * different columns of the same rows), not when they name different resources, and not when only
+ * enumeration changed.
  */
 function couldSupersede(first: string, second: string): boolean {
   const a = new URLSearchParams(first);
@@ -108,6 +116,7 @@ function couldSupersede(first: string, second: string): boolean {
   const keysB = [...new Set(b.keys())].sort().join('&');
   if (keysA !== keysB) return false;
   for (const key of IDENTITY_PARAMS) if (a.get(key) !== b.get(key)) return false;
+  for (const key of PROJECTION_PARAMS) if (a.get(key) !== b.get(key)) return false;
   return !differsOnlyByEnumeration(first, second);
 }
 
